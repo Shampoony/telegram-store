@@ -49,7 +49,7 @@ class DeleteCategory(StatesGroup):
 
 class AdminProtect(Filter):
     async def __call__(self, message: Message):
-        return message.from_user.id in [1190185138]
+        return message.from_user.id in ['YOUR TELEGRAM ID']
 
 
 @admin.message(AdminProtect(),Command('apanel'))
