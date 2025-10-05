@@ -9,6 +9,7 @@ async def set_user(tg_id):
         if not user:
             session.add(User(tg_id=tg_id))
             await session.commit()
+            
 async def set_item(data):
     async with async_session() as session:
         session.add(Item(**data))

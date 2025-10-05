@@ -100,8 +100,7 @@ async def onlymybasket(callback: CallbackQuery):
 async def buy_item(callback: CallbackQuery):
     item = await get_item_by_id(callback.data.split('_')[-1])
     await callback.message.answer(text='Большое спасибо тебе за покупку! Свяжись с продавцом напрямую.\
-                                Данный продавец проверен многими пользователями,\
-                                в чём ты можешь убедиться по отзывам в нащем канале.')
+                                Данный продавец проверен многими пользователями, в чём ты можешь убедиться по отзывам в нащем канале.')
 
 @router.callback_query(F.data.startswith('order_'))
 async def basket(callback: CallbackQuery):

@@ -1,14 +1,20 @@
+import asyncio
+import logging
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InputMediaPhoto
-from aiogram.filters import CommandStart, Command, Filter, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError
+from aiogram.filters import CommandStart, Command, Filter, StateFilter, or_f
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InputMediaPhoto
 
 import app.keyboards as kb
 from app.database.requests import get_users, set_item, set_category, get_item_by_id, update_item, delete_item,\
     set_image,delete_category_by_id,get_category_by_id, update_category, delete_photo_by_name, get_all_photos
 
 admin = Router()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class Newsletter(StatesGroup):
     message = State()
@@ -63,16 +69,93 @@ async def newsletter(message: Message, state: FSMContext):
     await message.answer('Отправте сообщение, которое вы хотите \
                         разослать всем пользователям бота')
 
-@admin.message(AdminProtect(),Newsletter.message)
+@admin.message(AdminProtect(), Newsletter.message)
 async def newsletter_message(message: Message, state: FSMContext):
-    await message.answer('Подождите.. идёт рассылка.')
-    for user in await get_users():
-        try:
-            await message.send_copy(chat_id=user.tg_id)
-        except:
-            pass
-    await message.answer('Рассылка успешно завершена.')
+    await message.answer('🚀 Начинаю рассылку...')
+    
+    users = await get_users()
+    users_list = list(users)  # Преобразуем ScalarResult в список
+    total_users = len(users_list)
+    success_count = 0
+    blocked_count = 0
+    error_count = 0
+    
+    # Отправляем батчами по 20 пользователей
+    batch_size = 20
+    
+    for i in range(0, total_users, batch_size):
+        batch = users_list[i:i + batch_size]
+        
+        # Создаем задачи для параллельной отправки
+        tasks = []
+        for user in batch:
+            task = send_to_user(message, user.tg_id)
+            tasks.append(task)
+        
+        # Ждем выполнения всех задач в батче
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Подсчитываем результаты
+        for result in results:
+            if result == "success":
+                success_count += 1
+            elif result == "blocked":
+                blocked_count += 1
+            else:
+                error_count += 1
+        
+        # Небольшая пауза между батчами
+        if i + batch_size < total_users:
+            await asyncio.sleep(1)
+        
+        # Обновляем прогресс каждые 100 пользователей
+        if (i + batch_size) % 100 == 0 or i + batch_size >= total_users:
+            current = min(i + batch_size, total_users)
+            await message.answer(
+                f"📊 Прогресс: {current}/{total_users}\n"
+                f"✅ Успешно: {success_count}\n"
+                f"🚫 Заблокировали: {blocked_count}\n"
+                f"❌ Ошибки: {error_count}"
+            )
+    
+    # Финальный отчет
+    await message.answer(
+        f"✅ Рассылка завершена!\n\n"
+        f"📈 Статистика:\n"
+        f"👥 Всего пользователей: {total_users}\n"
+        f"✅ Доставлено: {success_count}\n"
+        f"🚫 Заблокировали бота: {blocked_count}\n"
+        f"❌ Ошибки: {error_count}\n"
+        f"📊 Успешность: {success_count/total_users*100:.1f}%"
+    )
+    
     await state.clear()
+
+
+async def send_to_user(message: Message, user_id: int) -> str:
+    """Отправка сообщения одному пользователю с обработкой ошибок"""
+    try:
+        await message.send_copy(chat_id=user_id)
+        return "success"
+        
+    except TelegramForbiddenError:
+        logger.info(f"User {user_id} blocked the bot")
+        return "blocked"
+        
+    except TelegramRetryAfter as e:
+        # Слишком много запросов, ждем и повторяем
+        logger.warning(f"Rate limit hit, waiting {e.retry_after} seconds")
+        await asyncio.sleep(e.retry_after)
+        try:
+            await message.send_copy(chat_id=user_id)
+            return "success"
+        except:
+            return "error"
+            
+    except Exception as e:
+        logger.error(f"Error sending to user {user_id}: {e}")
+        return "error"
+    
 
 @admin.message(AdminProtect(),F.text=='Закрыть админ-меню ❌')
 async def close_menu(message: Message):
