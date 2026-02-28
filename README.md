@@ -3,7 +3,7 @@
 <p>
 This <strong>Store Telegram Bot</strong> allows you to easily sell products directly through Telegram.
 Admins can add products, manage the catalog, and send announcements to all users,
-while customers can browse items and quickly contact the seller to make a purchase.
+while customers can browse items and quickly contact the seller to arrange a purchase.
 </p>
 
 <p>
@@ -34,6 +34,13 @@ for example about new products, discounts, or special offers.
 <p>
 Customers can quickly contact the seller directly from the bot
 to ask questions or arrange a purchase.
+</p>
+
+<h4>⚠ Payment</h4>
+<p>
+At the moment, the bot does not support built-in payment processing.
+After selecting a product, users need to contact the seller directly
+to discuss payment and delivery details.
 </p>
 
 <h4>⚡ Simple and Convenient</h4>
